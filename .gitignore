@@ -1,2 +1,7 @@
 loader/build/
 ai-ref/
+xnu/BUILD/
+AvailabilityVersions/dst/
+AvailabilityVersions/obj/
+libdispatch/build/
+libdispatch/dst/

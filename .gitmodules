@@ -1,3 +1,9 @@
 [submodule "xnu"]
 	path = xnu
 	url = https://github.com/tansanrao/xnu.git
+[submodule "AvailabilityVersions"]
+	path = AvailabilityVersions
+	url = https://github.com/apple-oss-distributions/AvailabilityVersions.git
+[submodule "libdispatch"]
+	path = libdispatch
+	url = https://github.com/apple-oss-distributions/libdispatch.git

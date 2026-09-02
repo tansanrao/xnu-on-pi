@@ -6,6 +6,7 @@ QEMU ?= qemu-system-aarch64
 
 BUILD_DIR := build
 DTB := firmware/bcm2711-rpi-4-b.dtb
+KERNEL ?= ../xnu/BUILD/obj/DEVELOPMENT_ARM64_BCM2711/kernel.development.bcm2711
 ELF := $(BUILD_DIR)/loader.elf
 IMAGE := $(BUILD_DIR)/loader.img
 
@@ -48,10 +49,17 @@ $(BUILD_DIR)/start.o: start.S | $(BUILD_DIR)
 	$(CLANG) $(CLANGFLAGS) \
 		-c $< -o $@
 
-$(ELF): $(BUILD_DIR)/start.o $(BUILD_DIR)/Loader.o linker.ld
+$(BUILD_DIR)/kernel_blob.o: kernel_blob.S $(KERNEL) | $(BUILD_DIR)
+	$(CLANG) $(CLANGFLAGS) \
+		-DKERNEL_PATH=\"$(abspath $(KERNEL))\" \
+		-c $< -o $@
+
+$(ELF): $(BUILD_DIR)/start.o $(BUILD_DIR)/Loader.o $(BUILD_DIR)/kernel_blob.o linker.ld
 	$(LLD) $(LDFLAGS) \
-		$(BUILD_DIR)/start.o $(BUILD_DIR)/Loader.o \
-		-o $@
+		$(BUILD_DIR)/start.o \
+		$(BUILD_DIR)/Loader.o \
+		$(BUILD_DIR)/kernel_blob.o \
+ 		-o $@
 
 $(IMAGE): $(ELF)
 	$(OBJCOPY) --output-target=binary $< $@

@@ -19,6 +19,12 @@ SECTIONS
         *(.data .data.*)
     }
 
+    .kernel : ALIGN(0x4000) {
+        __kernel_image_start = .;
+        KEEP(*(.kernel))
+        __kernel_image_end = .;
+    }
+
     .bss (NOLOAD) : ALIGN(16) {
         __bss_start = .;
         *(.bss .bss.*)
@@ -30,6 +36,7 @@ SECTIONS
     __stack_bottom = .;
     . += 0x4000;
     __stack_top = .;
+    __loader_runtime_end = .;
 
     /DISCARD/ : {
         *(.comment)
@@ -37,3 +44,8 @@ SECTIONS
         *(.eh_frame*)
     }
 }
+
+ASSERT(
+    __loader_runtime_end <= 0x02000000,
+    "loader runtime overlaps XNU at 0x02000000"
+)

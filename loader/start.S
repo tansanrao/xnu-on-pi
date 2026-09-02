@@ -57,10 +57,15 @@ _start:
     // by the AArch64 procedure-call standard.
     mov sp, x1
 
-    // Call the Embedded Swift entry point.
-    //
-    // QEMU placed the DTB pointer in x0, and the C calling convention passes it
-    // as loader_main's first argument.
+    // Arguments to loader_main:
+    //   x0 = QEMU's Linux FDT
+    //   x1 = embedded XNU Mach-O
+    //   x2 = Mach-O byte count
+    //   x3 = architectural counter frequency
+    ldr x1, =__kernel_image_start
+    ldr x2, =__kernel_image_end
+    sub x2, x2, x1
+    mrs x3, cntfrq_el0
     bl loader_main
 
 // If loader_main returns, park the primary core as well.
@@ -70,3 +75,72 @@ _start:
 
 // Record the size of _start in the ELF symbol table.
 .size _start, . - _start
+
+// Enter XNU with:
+//   x0 = physical entry address
+//   x1 = physical boot_args address
+.global enter_xnu
+.type enter_xnu, %function
+
+enter_xnu:
+    mov x9, x0
+    mov x10, x1
+
+    // XNU starts with all asynchronous exceptions masked.
+    msr daifset, #0xf
+
+    // Make the copied instructions visible before branching to them.
+    dsb sy
+    ic iallu
+    dsb sy
+    isb
+
+    mrs x11, CurrentEL
+    cmp x11, #0x8
+    b.eq 5f
+
+    // This path permits reuse under firmware that already entered EL1.
+    cmp x11, #0x4
+    b.eq 6f
+    b 7f
+
+// QEMU raspi4b enters the loader at EL2h.
+5:
+    // Run EL1 as AArch64.
+    mrs x11, hcr_el2
+    orr x11, x11, #(1 << 31)
+    msr hcr_el2, x11
+
+    // Permit EL1 access to the physical counter and timer.
+    mrs x11, cnthctl_el2
+    orr x11, x11, #3
+    msr cnthctl_el2, x11
+    msr cntvoff_el2, xzr
+
+    // Do not trap floating-point/SIMD access from EL1.
+    msr cptr_el2, xzr
+
+    // Give EL1h a valid temporary stack. XNU will replace it later.
+    mov x11, sp
+    msr sp_el1, x11
+
+    // EL1h with D, A, I, and F masked.
+    mov x11, #0x3c5
+    msr spsr_el2, x11
+    msr elr_el2, x9
+
+    mov x0, x10
+    isb
+    eret
+
+// Already executing at EL1.
+6:
+    mov x0, x10
+    br x9
+
+// Unsupported exception level.
+7:
+    wfe
+    b 7b
+
+.size enter_xnu, . - enter_xnu
